@@ -7,19 +7,28 @@ This document defines the governing principles for the w5d.io platform. These pr
 ## Overview
 
 ```
-                                     ┌────────────────┐
-                                     │                │
-                        ┌────────────┤ Validation     │────────────┐
-                        │            │                │            │
-                        │            └────────────────┘            │
-                        │                                          │
-                        ▼                                          ▼
-┌────────┐      ┌────────────────┐      ┌──────────┐      ┌────────────────┐
-│        │      │ Declarative    │      │          │      │                │
-│ Edit   ├─────►│ Configuration  ├─────►│ Creation ├─────►│ Systems        │
-│        │      │ (Intent)       │      │          │      │                │
-└────────┘      └────────────────┘      └──────────┘      └────────────────┘
+┌────────────────┐      ┌────────────────┐
+│ Declarative    │      │                │
+│ Intent         ├─────►│ Systems        │
+│ (Configuration)│      │                │
+└────────────────┘      └────────────────┘
+    ▲                      ▲    ▲ 
+    .                      .    │
+    .        . . . . . . . .    │
+    .        .                  │
+┌────────────────┐      ┌────────────────┐
+│                │      │                │
+│ Validation     ├─────►│ Remediation    │
+│                │      │                │
+└────────────────┘      └────────────────┘
+
+Legend: 
+
+──────► : Main flow
+
+. . . ► : Read
 ```
+
 
 ## Principles
 
@@ -33,20 +42,13 @@ Declarative configuration:
 - Is version-controlled
 - Uses the format best suited for the purpose
 
----
+#### 1.1 Single Source of Truth
 
-### 2. Configuration as Documentation
-
-Declarative configuration is the documentation. No separate documentation is written by default. Separate documentation is only written where there is no other way to convey information that is not covered by the declarative configuration data itself and is kept to a minimum.
-
-- Each aspect of the platform is defined in exactly one place
-- Updating an aspect requires changes in only that place
-- Configuration must be self-explanatory: a reader with no prior context should be able to understand what it describes without consulting any external source
-- Where the configuration data alone cannot convey full context or rationale, comments within the configuration are the preferred form of supplementary documentation
+Declarative configuration is the single source of truth for the platform. No parallel documentation is maintained. Where the configuration data alone cannot convey full context or rationale, comments within the configuration are the preferred form of supplementary documentation.
 
 ---
 
-### 3. Independent Systems
+### 2. Systems
 
 The platform consists of independent systems, each realising a specific aspect of the intent.
 
@@ -56,25 +58,41 @@ Each system:
 - Realises the intent for the aspect it owns
 - Can be understood and reasoned about independently of other systems
 
----
+#### 2.1 Realisation Method
 
-### 4. Creation
+The realisation method is determined by the nature of the system and may be:
 
-Each system is brought into existence based on the relevant declarative configuration. The creation method is determined by the nature of the system and may be:
-
-- **Automatic:** the configuration is applied directly (e.g. Terraform)
-- **Semi-automatic:** some steps are automated, others are not
-- **Manual:** a human performs the required actions
+- Automatic: the configuration is applied directly (e.g. Terraform)
+- Semi-automatic: some steps are automated, others are not
+- Manual: a user performs the required actions
 
 ---
 
-### 5. Validation
+### 3. Validation
 
-Every system must be validated against the intent defined in its declarative configuration.
+Every system must be validated to detect any inconsistency between its actual state and the intent defined in its declarative configuration.
 
 Validation:
 
-- Must be automated
-- Must cover as much of the declarative configuration as possible; 100% coverage is the goal
-- Must detect and report any inconsistency between the system and the intent — this is the required baseline for all systems
-- May go beyond detection: depending on the system creation method, may produce actionable output or trigger automatic correction of inconsistencies
+- Runs fully automatically — no manual steps, checks, or acknowledgements are permitted
+- Must cover every configuration item that the system realises
+- Operates at a level of detail appropriate for determining that the intent is correctly realised
+
+#### 3.1 Triggers
+
+Validation must run under all of the following conditions:
+
+- Periodically, at a frequency appropriate to the system
+- On every change to the declarative configuration
+- On demand, when triggered manually
+
+---
+
+### 4. Remediation
+
+Every system must have a remediation strategy in place that is triggered on failed validations and that eventually brings the system back to successful validation.
+
+The remediation strategy may either:
+
+- Automatically correct the validation failure
+- Alert the user for manual correction of the validation failure
