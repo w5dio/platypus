@@ -70,6 +70,29 @@ Rejected alternative — dynamic/programmatic usage:
   - **HCP Terraform API:** workable but against the grain — HCP Terraform is not designed for cross-system output distribution
   - **Purpose-built outputs store:** cleanest interface, but requires building and hosting a new service
 
+### Config and Implementation: Single Repo vs. Split Repos
+
+**Decision:** single repo. Both the service implementation (Terraform files, schema) and the user-facing config (`config.yaml`) live in the same repository.
+
+The full spectrum of alternatives, in order of increasing abstraction and complexity:
+
+**Single repo** (chosen)
+- Implementation and config coexist in the same repository
+- Developer and user interact with the same repo; commits from both mix in git history
+- Simple — no cross-repo coordination required
+
+**Split repos** (GitOps pattern — ArgoCD, Flux)
+- A dedicated config repo holds only `config.yaml`; the implementation repo holds everything else
+- The workflow reads config from the config repo and applies the implementation from the impl repo
+- Clean access control and separate git histories, at the cost of two repos per service and cross-repo workflow coordination
+
+**API-based** (Kubernetes pattern)
+- A dedicated API server receives config submissions and manages the connection to the implementation entirely internally
+- Maximum abstraction for the user, maximum complexity to build and operate — effectively building a platform on top of a platform
+
+The single-repo approach was chosen for simplicity. It is arguably the less clean option — development and usage concerns are not strictly separated — but the trade-off is justified: the "users" of each service are developers who are comfortable with git, strict access control is not required at current scale, and the added complexity of split repos or an API layer would far outweigh any benefit.
+
+
 ### Config Format: Custom YAML vs. IaC Config
 
 **Decision:** custom YAML.
@@ -78,6 +101,28 @@ Rejected alternative — Terraform HCL directly:
 - Requires the user to know HCL syntax and Terraform concepts
 - Ties the config format to Terraform; switching provisioning tools would require rewriting user-facing config
 - Higher barrier to entry; harder to read at a glance
+
+### Documentation Authoring: Manual vs. Generated from Schema
+
+**Decision:** generated automatically from `config.schema.json`.
+
+- **Manual:** the developer writes `README.md` by hand, following platform guidelines
+- **Generated:** `README.md` is derived automatically from `config.schema.json`
+
+Generated documentation was chosen because the schema is already required for config validation — making it the single source of truth for both the config contract and all user-facing documentation eliminates any risk of docs diverging from the actual config. The developer only needs to maintain the schema; documentation accuracy is guaranteed by construction.
+
+### Documentation Generation: Developer Machine vs. CI Workflow
+
+**Decision:** CI workflow.
+
+- **Developer machine:** the developer runs a generation script locally and commits the result
+- **CI workflow:** the workflow generates `README.md` automatically on every run and commits it back if changed
+
+The CI workflow was chosen for two reasons. First, it imposes no tool dependencies on the developer — all generation tooling runs on the CI runner. Second, it guarantees eventual consistency: any commit to the repo triggers the workflow, which regenerates the README, so the docs are always in sync with the schema without relying on developer discipline.
+
+Rejected alternative — developer machine:
+- Requires the developer to have the generation tool installed locally
+- Developer may forget to regenerate after schema changes, causing docs to drift
 
 ### Output Surface: GitHub Actions Job Summary vs. Key-Value Store
 

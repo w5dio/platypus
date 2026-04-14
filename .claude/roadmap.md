@@ -1,10 +1,9 @@
 - [x] Terminology: settle on a terminology (framework? install? platform? service? repo name?)
 - [x] DECISIONS.md: extract architectural decisions and technology choices from design doc to DECISIONS.md, which will be a part of the repo
-- [ ] Restructure design doc: clearly separate discussion about framework repo and about service repo
+- [x] Restructure design doc: clearly separate discussion about framework repo and about service repo
+- [ ] Investigate platform versioning implementation
 - [ ] AGENTS.md: contains all the info that will guide an agent to develop a service repo. UPDATE: fully framework-managed, must not be edited by service developer, no sentinel markers
-- [ ] jsonschema2readme.sh: script that generates a README for a service repo from the JSON Schema of the service YAML config.
-- [ ] Makefile: commands for generating the README from the config JSON Schema and for validating the config against the JSON Schema.
-- [ ] run.yml: GitHub Actions workflow that applies the Terraform configuration and does so periodically (frequency is still TBD).
+- [ ] run.yml: GitHub Actions workflow that validates config, generates README (committing back if changed), applies Terraform, and publishes outputs to job summary. Runs on push, schedule, and on demand.
 - [ ] install script: installing the framework files in a service repository. Executed from within the service repository.
 - [ ] README.md: the README of this framework repo itself. Should contain as little as possible, only what's not already made clear by the other content of this repo.
 - [ ] plat-example repo: a full service repo built the same way as any real service, but with a dummy implementation that has no infrastructure dependencies. Serves as a worked example.
