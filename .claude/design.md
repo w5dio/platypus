@@ -4,8 +4,6 @@ This document captures the design of the Platypus platform. It is a map, not a s
 
 ## Contents
 
-- [Overview](#overview)
-  - [Terminology](#terminology)
 - [Framework Repository](#framework-repository)
 - [Service Repository](#service-repository)
   - [File Roles](#file-roles)
@@ -14,31 +12,11 @@ This document captures the design of the Platypus platform. It is a map, not a s
   - [Config](#config)
   - [Terraform Implementation](#terraform-implementation)
   - [Documentation](#documentation)
-  - [Service Implementation by Coding Agent](#service-implementation-by-coding-agent)
+  - [Agent Agnosticism](#agent-agnosticism)
   - [CI Workflow](#ci-workflow)
   - [Resilience](#resilience)
   - [Secrets](#secrets)
 - [Future Work](#future-work)
-
----
-
-## Overview
-
-Platypus is a self-service infrastructure provisioning platform intended for use across all domains (weibeld, W5D Labs, Rye & Cheese, w5d.io). Users define desired infrastructure as a declarative config; the platform takes care of provisioning and operating the infrastructure.
-
-The `platypus` repo is the **framework** for building the platform. It provides the framework files installed into service repos and defines what a service is and how it operates. All actual platform functionality is implemented in the individual service repos. The platform is the entirety of all live service repos built on this framework.
-
-Service implementation is developed with a coding agent — see [Service Implementation by Coding Agent](#service-implementation-by-coding-agent) in Platform Concepts.
-
-### Terminology
-
-| Term | Meaning |
-|---|---|
-| **Framework** | The `platypus` repo itself — provides the structure, conventions, and managed components that all services conform to |
-| **Platform** | The entirety of all live service repos built on the framework |
-| **Service** | A single provisioning unit, maintained in its own `plat-<name>` repo |
-| **Framework files** | Files installed by the framework (`framework/`) — not created or edited by the service developer |
-| **Service implementation** | Files provided by the service developer — Terraform files, config, schema, and generated README |
 
 ---
 
@@ -182,21 +160,9 @@ Output is for human consumption; apps do not read platform outputs at runtime.
 
 > **TBD:** tooling for README generation — candidates are `json-schema-for-humans` (Python) and `@adobe/jsonschema2md` (npm)
 
-### Service Implementation by Coding Agent
-
-#### Development Approach
-
-Service implementation is developed interactively with a coding agent — the same way any new project would be built with a coding agent. The developer and agent work back and forth: the developer describes what the service should do and makes decisions; the agent implements. The content and purpose of the service come entirely from the developer. `AGENTS.md` provides the agent with background context about the Platypus framework so the developer does not have to explain it in every session.
-
-#### Agent Agnosticism
+### Agent Agnosticism
 
 The platform is not tied to any specific agent. `AGENTS.md` is used as the instructions file because it is an emerging cross-agent standard; its content is plain Markdown with no agent-specific syntax. For compatibility with a specific agent, it is the developer's responsibility to configure their agent to read `AGENTS.md` (e.g. by pointing `CLAUDE.md` or `GEMINI.md` at it, or by renaming the file).
-
-#### AGENTS.md
-
-`AGENTS.md` contains all the background context about the Platypus framework that the coding agent needs — how services are structured, what files are framework-managed, how config and Terraform relate, and so on. This frees the developer from having to explain the framework in every session. It does not prescribe what a specific service should do; that comes from the developer through the session itself.
-
-`AGENTS.md` is fully framework-managed and must not be edited by the service developer.
 
 ### CI Workflow
 

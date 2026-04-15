@@ -2,7 +2,9 @@
 
 ## Overview
 
-The idea and goal of this project are described in `.claude/design.md`.
+This repo is the **framework** for building the Platypus platform. It provides the framework files installed into service repos and defines what a service is and how it operates. All actual platform functionality is implemented in the individual service repos. The platform is the entirety of all live service repos built on this framework.
+
+For more detail, see `.claude/design.md`.
 
 ## Internal docs
 

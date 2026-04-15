@@ -1,8 +1,20 @@
 # AGENTS.md — Platypus Service
 
-## What Is This Repo
+## Introduction
 
-> One paragraph: what Platypus is, what the service repo's purpose is, the agent's role
+### What Is This Repo
+
+This repo is a service of the **Platypus platform**. Platypus is a self-service infrastructure provisioning platform: users define desired infrastructure as a declarative config; the platform provisions and operates it. Each service is built by means of a framework.
+
+### Terminology
+
+- **Framework:** A set of files installed in every service repository that defines how services are developed, deployed, operated, and exposed to users — see [Framework Files](#framework-files)
+- **Service:** A GitHub repository that provisions and manages a related set of infrastructure resources via a declarative YAML config and Terraform
+- **Platform:** The entirety of all services built with the framework
+
+### Your Task
+
+Your task is to implement the service together with the developer. You each bring complementary knowledge: you know the Platypus framework — what files to create, how to structure them, and how everything fits together; the developer knows the service — what infrastructure it should provision and what it should look like to users. Work interactively: the developer describes what they want; you implement it within the framework.
 
 ## Framework Files
 
