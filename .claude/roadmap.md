@@ -2,8 +2,10 @@
 - [x] DECISIONS.md: extract architectural decisions and technology choices from design doc to DECISIONS.md, which will be a part of the repo
 - [x] Restructure design doc: clearly separate discussion about framework repo and about service repo
 - [x] Investigate platform versioning implementation
-- [ ] AGENTS.md: contains all the info that will guide an agent to develop a service repo. UPDATE: fully framework-managed, must not be edited by service developer, no sentinel markers
-- [ ] run.yml: GitHub Actions workflow that validates config, generates README (committing back if changed), applies Terraform, and publishes outputs to job summary. Runs on push, schedule, and on demand.
-- [ ] install script: installing the framework files in a service repository. Executed from within the service repository.
+- [ ] Core framework files: AGENTS.md, run.yml, install script
+  - Process: use design doc as the source. For each topic in the design doc, decide how it should appear in the target file, write it there, then remove it from the design doc. The design doc shrinks to empty and is deleted when done.
+  - [ ] AGENTS.md: contains all the info that will guide an agent to develop a service repo. Fully framework-managed, must not be edited by service developer, no sentinel markers
+  - [ ] run.yml: GitHub Actions workflow that validates config, generates README (committing back if changed), applies Terraform, and publishes outputs to job summary. Runs on push, schedule, and on demand.
+  - [ ] install script: installs framework files into a service repository. Executed from within the service repository.
 - [ ] README.md: the README of this framework repo itself. Should contain as little as possible, only what's not already made clear by the other content of this repo.
 - [ ] plat-example repo: a full service repo built the same way as any real service, but with a dummy implementation that has no infrastructure dependencies. Serves as a worked example.

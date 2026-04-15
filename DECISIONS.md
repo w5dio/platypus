@@ -143,6 +143,15 @@ Rejected alternative — developer machine:
 - Requires the developer to have the generation tool installed locally
 - Developer may forget to regenerate after schema changes, causing docs to drift
 
+### Schema Authoring: Agent-Generated vs. Tool-Generated Skeleton
+
+**Decision:** the coding agent generates `config.schema.json` in full — structure, types, and all annotations — interactively with the developer. No deterministic schema-inference tool is used.
+
+- **Agent-generated:** the coding agent writes the full schema from scratch, guided by its knowledge of the service and the developer's intent. Produces structure, types, and all mandatory annotations (`description`, `examples`, `default`) in one pass. No tool dependency. Any syntactic or structural errors in the schema are caught by the CI workflow's schema validation step on the next push — invalid JSON is rejected by the parser; invalid JSON Schema structure is rejected by a strict validator.
+- **Tool-generated skeleton:** a tool (e.g. `genson` in Python, `quicktype` in Node) infers structure and types from `config.yaml`, producing a skeleton that the agent and developer then annotate. Requires bundling the tool with the framework (adding a runtime dependency) for only a partial result — the tool cannot fill in `description`, `examples`, or `default`.
+
+The agent approach was chosen because it produces a more complete result than tool plus agent combined, with no added framework complexity. The coding agent is well-suited to generate the full schema unaided: JSON Schema is well-documented and LLMs produce reliable output for it, and the agent already has the service context needed to write accurate field descriptions.
+
 ### Output Surface: GitHub Actions Job Summary vs. Key-Value Store
 
 **Decision:** GitHub Actions job summary.
@@ -199,7 +208,7 @@ Natively supports all three required triggers: on config change (push), periodic
 
 ### Documentation Generation Tooling
 
-> **TBD:** tooling for `jsonschema2readme.sh`.
+> **TBD:** tooling used by the CI workflow to generate `README.md` from `config.schema.json`.
 
 Options considered:
 
@@ -208,6 +217,12 @@ Options considered:
 - **Custom script:** a wrapper around one of the above to enforce the specific README structure the platform requires
 
 The custom script layer is likely necessary regardless of which tool is chosen.
+
+### Schema Validation Tooling
+
+> **TBD:** specific tool for validating `config.yaml` against `config.schema.json` in the CI workflow.
+
+The chosen tool must validate the schema file itself (against the JSON Schema meta-schema) before using it to validate the config — not just use the schema silently and produce unexpected results if it is structurally invalid. Strict validation catches both invalid JSON syntax and invalid JSON Schema structure at the point of failure rather than downstream.
 
 ### Secrets Management
 
