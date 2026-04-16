@@ -6,7 +6,6 @@ This document captures the design of the Platypus platform. It is a map, not a s
 
 - [Platform Concepts](#platform-concepts)
   - [Framework Installation](#framework-installation)
-  - [Config](#config)
   - [Terraform Implementation](#terraform-implementation)
   - [Documentation](#documentation)
   - [Agent Agnosticism](#agent-agnosticism)
@@ -32,14 +31,6 @@ curl https://raw.githubusercontent.com/w5dio/platypus/refs/heads/main/install | 
 The command is run from the service repo root. No local clone of the framework repo is required — the script fetches and copies the framework files directly. Re-running the command is safe; managed files are overwritten in full.
 
 The URL is intended to eventually be replaced by a shortened URL (e.g. `https://w5d.io/platypus/install`), keeping the install command concise and memorable.
-
-### Config
-
-- Each service has exactly one config file, named `config.yaml`, at the repo root
-- The config is declarative — it describes desired state; the service ensures actual state matches it
-- Each service must have a JSON Schema for its `config.yaml`, named `config.schema.json`
-- Every resource in the config must be something the service directly creates and manages — resources managed outside the platform have no place in service config
-- The fields and their meaning are determined by the service developer
 
 ### Terraform Implementation
 

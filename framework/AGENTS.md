@@ -45,7 +45,11 @@ The following files are created automatically by the framework — do not create
 
 ## Config
 
-> The Config is the developer's domain — they either provide it directly or describe clearly what it should look like. It is the starting point for creating the Config Schema.
+A file named `config.yaml` in the root directory of the repository. It is the declarative interface the service provides to its users: it exposes all the parameters users may set to configure what the service provisions on their behalf.
+
+The structure of the Config file is defined by the [Config Schema](#config-schema). The Config is read by the Terraform code. The Config file must always be present in the repository.
+
+> **Note:** a newly developed service that has not yet been used may have an empty Config file, which is expected.
 
 ## Config Schema
 
