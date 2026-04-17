@@ -1,229 +1,369 @@
 # DECISIONS.md — Platypus
 
-Permanent record of architectural and technology decisions made during the design of the Platypus framework.
+Permanent record of architectural decisions and technology choices made during the design of the Platypus platform, including the rationales behind them. Serves as a reference so that already-answered questions are not revisited.
 
 ---
 
 ## Architectural Decisions
 
-Deliberate choices about the scope, shape, and direction of the platform — what it is, what it does, and what it explicitly does not do.
+Deliberate choices about the scope, shape, and direction of the platform. Some decisions build on top of each other; others build on top of technology choices.
 
-### Platform Purpose: Provisioning vs. Inventory
+### Platform Purpose: Provisioning vs. Provisioning + Inventory
 
-**Decision:** provisioning only. Every resource in a service's config must be something the service directly creates and manages.
+What's the fundamental purpose of the platform?
 
-Two fundamentally different purposes are possible for a platform that manages infrastructure:
-
-**Provisioning**
+**Provisioning:**
 
 - The platform creates and manages resources according to a declarative config
 - The config is prescriptive — it defines what should exist, and the platform makes it so
 - Every item in the config is owned by the platform; the platform is the single source of truth for its state
 - The scope is strictly bounded: if it's not in the config, the platform doesn't know about it
 
-**Inventory**
+**Provisioning + Inventory:**
 
-- The platform maintains a record of what resources and services exist, including those created and managed outside the platform
+- In addition to provisioning, the platform maintains a record of what resources and services exist, including those created and managed outside the platform
 - The config is descriptive — it documents reality rather than prescribing it
 - Items in the config may be managed by other tools, teams, or processes; the platform has no control over them
 - The scope is unbounded: anything that exists can in principle be listed
 
-Platypus focuses exclusively on provisioning. Mixing inventory into the same config introduces irresolvable conflicts: a provisioning platform must be able to act on its config (create, update, delete resources), but acting on inventory items it doesn't own would be destructive. Keeping the two concerns separate avoids this entirely.
+**Decision:** Provisioning
 
-> Note: the inventory concern may be addressed in a separate future project (initial ideas in [w5dio/inventory](https://github.com/w5dio/inventory)) that discovers resources by querying live systems — purely read-only, no config required, and entirely unrelated to Platypus.
+**Rationale:** Mixing inventory into the platform conflates concerns. It bloats the config and requires actively recording and keeping in sync resources managed outside the platform — if not done diligently, the inventory becomes inaccurate and loses its value.
 
-### Service Lifecycle: On-Demand Provisioning vs. Shared Infrastructure
+> Note: the inventory concern will be addressed in a separate future project (ideas in [w5dio/inventory](https://github.com/w5dio/inventory)) that discovers resources by querying live systems — purely read-only, no config required, and entirely unrelated to Platypus.
 
-**Decision:** on-demand provisioning only.
+### Provisioning Model: Per-User vs. Shared
 
-**On-demand provisioning**
+For whom is infrastructure provisioned?
 
-- Infrastructure is provisioned on request for a specific app or user
-- The lifecycle of the provisioned infrastructure is determined by the app or user that requested it
+**Per-User:**
+
+- Infrastructure is provisioned on request for a specific user of the platform
+- The lifecycle of the provisioned infrastructure is determined by the user that requested it
 - To provision or modify infrastructure, the user edits the config of the corresponding platform service
 - Users actively interact with the platform — it is visible and central to their workflow
 
-**Shared infrastructure**
+**Shared:**
 
-- Infrastructure is provisioned independently of any concrete request and is meant to be shared by any app or user that wants to use it
-- The lifecycle of the infrastructure is determined by the platform operator, not by individual users
-- Users or apps access the infrastructure directly (e.g. via a URL) without going through the platform
-- The platform is invisible to users in practice — it is only touched for operational changes that affect the infrastructure as a whole
+- Infrastructure is provisioned independently of any concrete request and is meant to be shared by any user that wants to use it
+- The lifecycle of the infrastructure is determined by the platform operator, not by users
+- Users access the infrastructure directly (e.g. via a URL) without going through the platform
+- The platform is invisible to users of the shared infrastructure — it is only touched for operational changes that affect the shared infrastructure as a whole
 
-Platypus provides on-demand provisioning only. A unified platform framework only provides value when users actively interact with it.
+**Decision:** Per-User
 
-> Note: shared infrastructure will be maintained as standalone repositories in the w5d.io GitHub organisation, outside of the Platypus project.
+**Rationale:** Shared infrastructure doesn't fit the Platypus model: it is accessed directly by users without ever going through the platform, making a self-service provisioning platform the wrong tool to manage it.
 
-### Usage Mode: Manual vs. Programmatic
+> Note: shared infrastructure will be maintained in standalone repositories in the [w5d.io](https://github.com/w5dio/) GitHub organisation outside of Platypus or any other platform or framework.
 
-**Decision:** manual.
+### Interaction Model: Manual vs. Programmatic
 
-- **Config editing:** a developer edits `config.yaml` by hand; no program writes to it
-- **Output reading:** a developer reads outputs from the GitHub Actions job summary and manually wires relevant values into app config; no program reads platform outputs at runtime
+How is the Platypus platform interacted with?
 
-Rejected alternative — dynamic/programmatic usage:
-- Introduces excessive complexity, coupling, and failure vectors for a modest gain
-- Options considered for dynamic/programmatic output consumption:
-  - **Terraform remote state:** requires the client to also use Terraform (dealbreaker: clients should need no IaC tooling)
-  - **SSM Parameter Store:** clients need AWS credentials just to read a value (introduces an AWS dependency for unrelated clients)
-  - **Shared state repo/output file committed to a repo:** pollutes git history with machine-generated commits; concurrency risk; conflates human intent (config) with machine state (outputs)
-  - **HCP Terraform API:** workable but against the grain — HCP Terraform is not designed for cross-system output distribution
-  - **Purpose-built outputs store:** cleanest interface, but requires building and hosting a new service
+**Manual:**
 
-### Config and Implementation: Single Repo vs. Split Repos
+- Human users interact with the platform by editing the service config in service repositories and reading provisioning outputs from the workflow
+- Simple, no tooling dependencies on the user's side
 
-**Decision:** single repo. Both the service implementation (Terraform files, schema) and the user-facing config (`config.yaml`) live in the same repository.
+**Programmatic:**
 
-The full spectrum of alternatives, in order of increasing abstraction and complexity:
+- Programs edit service configs in service repositories and consume provisioning outputs at runtime, enabling automated or event-driven provisioning
+- Requires a reliable mechanism for programmatic output distribution — all viable options introduce significant complexity or external dependencies
 
-**Single repo** (chosen)
-- Implementation and config coexist in the same repository
-- Developer and user interact with the same repo; commits from both mix in git history
-- Simple — no cross-repo coordination required
+**Decision:** Manual
 
-**Split repos** (GitOps pattern — ArgoCD, Flux)
-- A dedicated config repo holds only `config.yaml`; the implementation repo holds everything else
-- The workflow reads config from the config repo and applies the implementation from the impl repo
-- Clean access control and separate git histories, at the cost of two repos per service and cross-repo workflow coordination
+**Rationale:** Programmatic output consumption introduces significant complexity and external dependencies. Manual usage requires no tooling and is fully sufficient for the current scope of the platform.
 
-**API-based** (Kubernetes pattern)
-- A dedicated API server receives config submissions and manages the connection to the implementation entirely internally
-- Maximum abstraction for the user, maximum complexity to build and operate — effectively building a platform on top of a platform
+### Provisioning Outputs: Workflow vs. External System
 
-The single-repo approach was chosen for simplicity. It is arguably the less clean option — development and usage concerns are not strictly separated — but the trade-off is justified: the "users" of each service are developers who are comfortable with git, strict access control is not required at current scale, and the added complexity of split repos or an API layer would far outweigh any benefit.
+Where can the user access the outputs of a provisioning run (e.g. the IP address of a provisioned compute instance)?
 
+**Workflow:**
 
-### Framework Versioning: Tagged Releases vs. Always Latest
-
-**Decision:** no versioning — the install script always fetches the current `main`. All service repos are expected to track the latest framework.
-
-Two approaches are possible:
-
-**Tagged releases**
-
-- The framework publishes tagged releases (e.g. `v1`, `v1.2`)
-- The `install` script accepts an optional version argument passed via `bash -s -- v1.2`, allowing service repos to pin to a specific version
-- Updates are opt-in and auditable — a service repo commit shows explicitly which version it upgraded to
-
-**Always latest** (chosen)
-
-- The install script always installs from `main`; no version argument
-- Re-running `install` updates the service repo to the current framework
-
-Tagged releases were rejected for three reasons. First, there is no use case for different service repos running different framework versions — all are expected to stay current, so version pinning provides no practical benefit. Second, the `curl | bash` execution model makes passing a version argument awkward (requires the non-obvious `bash -s --` syntax). Third, the install URL uses a shortened URL for convenience, which cannot encode a version in the path — making URL-based version selection impossible regardless.
-
-### Config Format: Custom YAML vs. IaC Config
-
-**Decision:** custom YAML.
-
-Rejected alternative — Terraform HCL directly:
-- Requires the user to know HCL syntax and Terraform concepts
-- Ties the config format to Terraform; switching provisioning tools would require rewriting user-facing config
-- Higher barrier to entry; harder to read at a glance
-
-### Documentation Authoring: Manual vs. Generated from Schema
-
-**Decision:** generated automatically from `config.schema.json`.
-
-- **Manual:** the developer writes `README.md` by hand, following platform guidelines
-- **Generated:** `README.md` is derived automatically from `config.schema.json`
-
-Generated documentation was chosen because the schema is already required for config validation — making it the single source of truth for both the config contract and all user-facing documentation eliminates any risk of docs diverging from the actual config. The developer only needs to maintain the schema; documentation accuracy is guaranteed by construction.
-
-### Documentation Generation: Developer Machine vs. CI Workflow
-
-**Decision:** CI workflow.
-
-- **Developer machine:** the developer runs a generation script locally and commits the result
-- **CI workflow:** the workflow generates `README.md` automatically on every run and commits it back if changed
-
-The CI workflow was chosen for two reasons. First, it imposes no tool dependencies on the developer — all generation tooling runs on the CI runner. Second, it guarantees eventual consistency: any commit to the repo triggers the workflow, which regenerates the README, so the docs are always in sync with the schema without relying on developer discipline.
-
-Rejected alternative — developer machine:
-- Requires the developer to have the generation tool installed locally
-- Developer may forget to regenerate after schema changes, causing docs to drift
-
-### Schema Authoring: Agent-Generated vs. Tool-Generated Skeleton
-
-**Decision:** the coding agent generates `config.schema.json` in full — structure, types, and all annotations — interactively with the developer. No deterministic schema-inference tool is used.
-
-- **Agent-generated:** the coding agent writes the full schema from scratch, guided by its knowledge of the service and the developer's intent. Produces structure, types, and all mandatory annotations (`description`, `examples`, `default`) in one pass. No tool dependency. Any syntactic or structural errors in the schema are caught by the CI workflow's schema validation step on the next push — invalid JSON is rejected by the parser; invalid JSON Schema structure is rejected by a strict validator.
-- **Tool-generated skeleton:** a tool (e.g. `genson` in Python, `quicktype` in Node) infers structure and types from `config.yaml`, producing a skeleton that the agent and developer then annotate. Requires bundling the tool with the framework (adding a runtime dependency) for only a partial result — the tool cannot fill in `description`, `examples`, or `default`.
-
-The agent approach was chosen because it produces a more complete result than tool plus agent combined, with no added framework complexity. The coding agent is well-suited to generate the full schema unaided: JSON Schema is well-documented and LLMs produce reliable output for it, and the agent already has the service context needed to write accurate field descriptions.
-
-### Output Surface: GitHub Actions Job Summary vs. Key-Value Store
-
-**Decision:** GitHub Actions job summary.
-
-**GitHub Actions job summary**
-
+- Outputs are published to the GitHub Actions job summary after each provisioning run
 - No new dependency and no additional service to build or maintain
-- Exposes an internal implementation detail (GitHub Actions) to the user
-- The user must navigate the GitHub Actions UI to find the output
+- Exposes an internal implementation detail (GitHub Actions) to the user; the user must navigate the GitHub Actions UI to find outputs
 
-**Hosted key-value store**
+**External System:**
 
-- Fully abstracts away the internal implementation
-- Extensible: could support a future GUI or dashboard
-- Requires building a new service or taking on an external dependency
+- Outputs are stored in a dedicated external system (e.g. a key-value store, database, or separate repository) after each run
+- Fully abstracts away internal implementation details
+- Enables building on top of the platform (e.g. a UI or dashboard)
+- Requires building a new service or adopting an external dependency
 
-The job summary was chosen for its simplicity and zero additional infrastructure.
+**Decision:** Workflow
 
-> Note: the key-value store remains an option for a future version, particularly if a more polished output UX becomes a priority.
+**Rationale:** An external system requires building or adopting additional infrastructure. The job summary requires no additional infrastructure and is sufficient for the current manual interaction model.
+
+### Framework Release Model: Discrete Versions vs. Always Latest
+
+How are framework updates released to service repositories?
+
+**Discrete Versions:**
+
+- The framework repository publishes tagged releases (e.g. `v1.0`, `v1.1`); the install script fetches a specified version
+- Different service repositories can pin to different versions; updates are explicit and opt-in
+- Adds complexity to the installation process and requires ongoing version management across service repositories
+
+**Always Latest:**
+
+- The framework has no versions; the install script always fetches the current state of `main`
+- Installation is simple — nothing to specify or track
+- No record of which framework state is installed in each service repository; services installed at different times may have diverged
+
+**Decision:** Always Latest
+
+**Rationale:** Discrete versions add installation complexity with no practical benefit — there is no use case for deliberately running different framework versions across service repositories.
+
+> Note: as a future improvement to the chosen approach, the install script could record the installed framework commit SHA in a `.version` file in the service repository. The GitHub Actions workflow could then compare this against the latest upstream SHA and automatically reinstall the framework when they diverge. This would automatically keep all service repositories current without manual intervention.
+
+### Service Config Isolation: Shared Repo vs. Dedicated Repo vs. API
+
+Where does the service config live relative to the service implementation?
+
+**Shared Repo:**
+
+- The config and service implementation coexist in the same repository
+- Simple — no cross-repository coordination required
+- Developer and user commits mix in the same Git history; no strict separation of concerns
+
+**Dedicated Repo:**
+
+- The config lives in a separate repository from the service implementation (GitOps pattern, e.g. ArgoCD, Flux)
+- Clean separation: distinct Git histories and independent access control per repository
+- Requires managing two repositories per service and cross-repository workflow coordination
+
+**API:**
+
+- Users submit config changes to a dedicated API server, which manages the connection to the implementation internally (Kubernetes pattern)
+- Maximum abstraction for the user — no knowledge of the underlying implementation required
+- Maximum complexity to build and operate — effectively building a platform on top of a platform
+
+**Decision:** Shared Repo
+
+**Rationale:** Split repositories and an API layer add significant complexity with no practical benefit at current scale — in practice, the service developer and service user are often the same person, so strict separation or access control is not required.
+
+### Service Config Format: YAML vs. Terraform Variables
+
+What format is the service config specified in?
+
+**YAML:**
+
+- The config is a human-readable YAML file
+- Tool-agnostic — not tied to any specific IaC tool or syntax
+- Low barrier to entry — no knowledge of Terraform or HCL required
+- Requires decoding YAML in the Terraform code and mapping values to Terraform variables, adding a translation layer and complexity
+
+**Terraform Variables:**
+
+- The config is a `.tfvars` file; variables are defined in native HCL syntax and read directly by Terraform
+- No translation layer — Terraform handles types and validation natively
+- Ties the config format to Terraform; switching IaC tools would require rewriting the config
+- Requires users to know HCL syntax
+
+**Decision:** YAML
+
+**Rationale:** Terraform Variables expose Terraform — an implementation detail — directly to the user. A core goal of the platform is to hide IaC tooling from users; the translation overhead of YAML is a manageable implementation detail in service of that goal.
+
+### Service Docs Source: Developer vs. Config Schema
+
+What is the source of the service documentation?
+
+**Developer:**
+
+- The developer writes the README by hand, following platform guidelines
+- Flexible — documentation can cover anything beyond what the config schema describes
+- Risk of docs drifting from the actual config over time; requires developer discipline to keep in sync
+
+**Config Schema:**
+
+- The README is generated automatically from the config schema
+- The config schema is the single source of truth for both the config contract and the documentation — docs cannot drift from reality
+- No separate documentation effort required; the developer only needs to maintain the schema
+
+**Decision:** Config Schema
+
+**Rationale:** The config schema is already required for config validation. Making it drive the documentation too eliminates any risk of docs drifting from the actual config, with no additional effort from the developer.
+
+### Service Docs Generation: Developer vs. Workflow
+
+Who runs the service documentation generation?
+
+**Developer:**
+
+- The developer runs a generation script locally and commits the result
+- Requires generation tooling to be installed and run locally
+- Documentation may fall out of sync if the developer forgets to regenerate after schema changes
+
+**Workflow:**
+
+- The GitHub Actions workflow generates the README from the config schema on every push and commits the result back if changed
+- No tool dependencies on the developer — all generation tooling runs on the CI runner
+- Guarantees eventual consistency — docs are always in sync with the schema without relying on developer discipline
+
+**Decision:** Workflow
+
+**Rationale:** Local generation requires tool dependencies and relies on developer discipline to stay in sync. The workflow imposes neither constraint.
+
+### Service Config Schema Source: Agent vs. JSON Schema Generator
+
+How is the service config schema created?
+
+**Agent:**
+
+- The developer describes the intended config to the agent — informally and incrementally — and the agent produces a complete, valid schema
+- Straightforward to iterate: the developer can refine requirements conversationally
+- Agent instructions can restrict how the schema must look (required annotations, forbidden keywords, etc.), making output more predictable
+- Non-deterministic by nature, though constrained by the agent instructions
+
+**JSON Schema Generator:**
+
+- The developer runs a tool (e.g. `genson`, `quicktype`) that infers a schema from a fully specified example config
+- Deterministic — the same input always produces the same schema
+- Requires a fully specified example config upfront; cannot infer intent from informal descriptions
+- Cannot produce annotations (field descriptions, examples, etc.) — the developer must add these to the schema manually
+- Requires bundling the tool with the framework, adding a runtime dependency
+
+**Decision:** Agent
+
+**Rationale:** Coding agents produce reliable JSON schemas — the format is well-documented and well-represented in training data, and the agent already has the service context to write accurate field descriptions. The process can be further improved and made more predictable by restricting the schema format in the agent instructions.
+
+### Service Config Schema Validation: Meta-Schema vs. None
+
+How is the config schema itself validated?
+
+**Meta-Schema:**
+
+- A meta-schema is a schema for the schema — it validates whether the config schema itself conforms with requirements that we define
+- Can only enforce negative constraints (e.g. reject disallowed keywords via `additionalProperties: false`) but cannot enforce positive requirements (e.g. a `description` annotation present on every field) — validation is therefore partial regardless
+- Must be hosted at a stable public URL because validators fetch the `$schema` URI over HTTP — adding an external dependency and operational concern
+
+**None:**
+
+- No formal validation of the config schema; the agent is fully trusted to produce a schema that conforms to the agent instructions
+- No hosting requirement, no additional infrastructure
+
+**Decision:** None
+
+**Rationale:** A meta-schema provides only partial validation — it cannot enforce positive requirements, meaning complete formal validation would require additional checks regardless. Since full enforcement is not achievable, fully relying on the agent as the single point of enforcement is simpler and more consistent.
+
+> Note: it should be empirically tested in practice whether the agent can indeed reliably produce valid schemas that conform to the agent instructions.
+
+### Service Config Schema Scope: Structure vs. Value Constraints
+
+How detailed should the config schema be?
+
+**Structure:**
+
+- The schema defines the structure of the config — field types, required fields, and allowed values (`enum`) — but does not constrain values further (e.g. number ranges, string formats, array lengths)
+- Smaller and more clearly bounded scope for the schema, making schema creation by the agent more predictable
+- Risk that incorrectly formatted or otherwise invalid values are passed into the system
+
+**Value Constraints:**
+
+- In addition to structure, the schema encodes constraints on field values: ranges (`minimum`, `maximum`), string patterns (`pattern`), array lengths (`minItems`, `maxItems`), etc.
+- Invalid values are detected before they enter the system
+- Constraints expressed in the schema can be surfaced in the generated documentation
+- May bloat the schema and make schema creation by the agent less predictable
+- Cannot cover all possible constraint types — it is not guaranteed that no invalid values will ever enter the system regardless
+
+**Decision:** Structure
+
+**Rationale:** Schema value constraints cannot cover all possible constraints, so invalid values entering the system cannot be fully prevented regardless. Keeping the schema small and focused might weigh more than validation that is as complete as possible. Constraints on values can be informally expressed in the `description` annotations of the fields which are surfaced in the documentation.
 
 ---
 
 ## Technology Choices
 
-### IaC Tool: Terraform
+Concrete technology choices for implementing the platform, recorded where multiple viable options exist and the decision is not self-evident.
 
-**Decision:** all IaC in the platform uses Terraform.
+### Infrastructure as Code (IaC) Tool: Terraform
+
+**Considered options:**
 
 - **Terraform:** industry standard, declarative HCL, excellent provider ecosystem (including Cloudflare), plan/apply is a natural validation/remediation mechanism
-- **OpenTofu:** functionally identical but no managed state service comparable to HCP Terraform's free tier
+- **OpenTofu:** functionally identical to Terraform but no managed state service comparable to HCP Terraform's free tier
 - **Pulumi:** uses real programming languages but is overkill for config-level IaC
 - **Ansible:** procedural, not truly declarative, no state model
 - **Direct API scripts:** no declarative or plan/diff benefits
 
+**Decision:** Terraform
+
+**Rationale:** Terraform is the industry standard with the best provider ecosystem and a plan/apply model that maps naturally onto the platform's validate-then-apply workflow. No other tool offers a meaningful advantage for our purpose — alternatives are either functionally identical (OpenTofu), overkill (Pulumi), or lack a declarative state model.
+
 ### Terraform State Storage: HCP Terraform
 
-**Decision:** all Terraform state is stored in HCP Terraform.
+**Considered options:**
 
 - **Local file:** not accessible from GitHub Actions — ruled out
-- **Git:** state can contain secrets, causes messy diffs
+- **Git:** state can contain secrets; causes messy diffs
 - **S3 + DynamoDB:** viable but requires managing AWS credentials in GitHub Actions solely for state access
 - **HCP Terraform:** free tier covers unlimited state storage and up to 500 managed resources, clean integration via `hashicorp/setup-terraform`, handles state locking out of the box
 
+**Decision:** HCP Terraform
+
+**Rationale:** HCP Terraform is the only option with zero additional credential management, native GitHub Actions integration, and free-tier state storage including locking — no other option matches this combination without added operational overhead.
+
 ### Automation Platform: GitHub Actions
 
-**Decision:** all automated workflows run on GitHub Actions.
-
-Natively supports all three required triggers: on config change (push), periodically (schedule), and on demand (workflow_dispatch).
+**Considered options:**
 
 - **GitHub Actions:** native to GitHub, free hosted runners, no additional integration needed
-- **VPS + cron:** no native git trigger, no audit trail, requires maintaining a server
-- **Other CI platforms (CircleCI, Jenkins, Buildkite etc.):** require external integration since code lives on GitHub
-- **Serverless schedulers (AWS EventBridge + Lambda, GCP Cloud Scheduler + Cloud Run, etc.):** none natively support the git push trigger without additional wiring
+- **VPS + cron:** no native Git trigger, no audit trail, requires maintaining a server
+- **Other CI platforms (CircleCI, Jenkins, Buildkite, etc.):** require external integration and credentials since code lives on GitHub
+- **Serverless schedulers (AWS EventBridge + Lambda, GCP Cloud Scheduler + Cloud Run, etc.):** require additional wiring to integrate with GitHub
 
-### Documentation Generation Tooling
+**Decision:** GitHub Actions
 
-> **TBD:** tooling used by the CI workflow to generate `README.md` from `config.schema.json`.
+**Rationale:** GitHub Actions is native to GitHub — no external integration, credentials, or additional services required. All other options need some form of integration with GitHub to achieve the same result.
 
-Options considered:
+### Service Docs Generation: TBD
 
-- **`json-schema-for-humans`** (Python): generates Markdown from JSON Schema in various formats
-- **`@adobe/jsonschema2md`** (npm): generates Markdown from JSON Schema, well-maintained
-- **Custom script:** a wrapper around one of the above to enforce the specific README structure the platform requires
+Tooling used by the workflow to generate the service documentation in the README from the config schema.
 
-The custom script layer is likely necessary regardless of which tool is chosen.
+**Considered options:**
 
-### Schema Validation Tooling
+> WIP: work in progress - this list is not final.
 
-> **TBD:** specific tool for validating `config.yaml` against `config.schema.json` in the CI workflow.
+- **[`json-schema-for-humans`](https://github.com/coveooss/json-schema-for-humans)** (Python): generates HTML or Markdown from JSON Schema; supports multiple output templates
+- **[`@adobe/jsonschema2md`](https://github.com/adobe/jsonschema2md)** (Node.js): converts JSON Schema into Markdown; targets JSON Schema 2019-09
+- **Custom script:** a bespoke script that generates the README directly from the config schema without relying on a third-party tool
 
-The chosen tool must validate the schema file itself (against the JSON Schema meta-schema) before using it to validate the config — not just use the schema silently and produce unexpected results if it is structurally invalid. Strict validation catches both invalid JSON syntax and invalid JSON Schema structure at the point of failure rather than downstream.
+**Decision:** TBD
 
-### Secrets Management
+**Rationale:** TBD
 
-> **TBD:** options for maintaining and exposing secrets for provisioning runs.
+### Service Config Validation: TBD
+
+Tooling used by the workflow to validate the config against the config schema.
+
+**Considered options:**
+
+> WIP: work in progress - this list is not final.
+
+- **[`ajv-cli`](https://github.com/ajv-validator/ajv-cli)** (Node.js): CLI for AJV, one of the fastest and most widely used JSON Schema validators; supports YAML and JSON Schema draft-07 through 2020-12
+- **[`check-jsonschema`](https://github.com/python-jsonschema/check-jsonschema)** (Python): CLI and pre-commit hooks for JSON Schema validation, maintained by the python-jsonschema team
+- **[`sourcemeta/jsonschema`](https://github.com/sourcemeta/jsonschema)** (C++): comprehensive JSON Schema CLI covering validation, linting, formatting, and bundling; supports YAML
+
+**Decision:** TBD
+
+**Rationale:** TBD
+
+### Secrets Management: TBD
+
+Storage location for secrets required by the provisioning code.
+
+**Considered options:**
+
+> WIP: work in progress - this list is not final.
+
+- **GitHub Actions Repository Secrets:** per-service secrets stored in each service repository; must be duplicated for shared credentials across services — impractical at scale
+- **GitHub Actions Organisation Secrets:** stored once at the GitHub organisation level; accessible by all service repositories; native to GitHub, zero additional infrastructure
+- **HCP Vault Secrets:** managed secrets store on HCP; natural complement to HCP Terraform which the platform already uses; accessible from GitHub Actions via the HCP Vault Secrets Action
+- **Managed secret store (AWS Secrets Manager, Azure Key Vault, etc.):** dedicated cloud-hosted secrets stores; require cloud credentials in GitHub Actions to access them — adds an external dependency
+- **Self-hosted secret manager (HashiCorp Vault, Infisical, OpenBao, etc.):** powerful and flexible; requires building and operating additional infrastructure
+- **OIDC:** eliminates stored long-lived credentials by requesting short-lived tokens from the cloud provider at runtime; only applicable to cloud providers that support OIDC with GitHub Actions — not universal
+
+**Decision:** TBD
+
+**Rationale:** TBD
