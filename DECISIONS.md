@@ -317,20 +317,20 @@ Concrete technology choices for implementing the platform, recorded where multip
 
 **Rationale:** GitHub Actions is native to GitHub — no external integration, credentials, or additional services required. All other options need some form of integration with GitHub to achieve the same result.
 
-### Service Docs Generation: TBD
+### Service Docs Generation: Custom Script
 
 Tooling used by the workflow to generate the service documentation in the README from the config schema.
 
 **Considered options:**
 
-- **Custom script:** a bespoke script that generates the README directly from the config schema; full control over output format with no external dependency; requires writing and maintaining the script
 - **Third-party JSON Schema to Markdown conversion tool (`json-schema-for-humans`, `jsonschema-markdown`, `wetzel`, etc.):** no custom code required but introduces an external dependency and cedes control over output format
+- **Custom script:** a bespoke script that generates the README directly from the config schema; full control over output format with no external dependency; requires writing and maintaining the script
 
-> Note: the full list of researched third-party tools can be found in `.claude/research.md`.
+**Decision:** Custom script
 
-**Decision:** TBD
+**Rationale:** Existing third-party tools are opinionated in their output format and not easily adapted to our specific requirements. Given the schema restrictions imposed by the framework which limit schema complexity, the conversion logic is manageable and straightforward to implement while allowing full control over the output format.
 
-**Rationale:** TBD
+> Note: extensive research on existing JSON Schema to Markdown conversion tools has been conducted in `.claude/research/research.md`.
 
 ### Service Config Validation: TBD
 

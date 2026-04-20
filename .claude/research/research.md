@@ -32,16 +32,15 @@ Each file in a fully developed service repository can be characterised along mul
 
 ## JSON Schema to Markdown Conversion Tool Evaluation
 
-> Note: full research output in [`jsonschema2markdown/`](jsonschema2markdown).
+Background research for the service docs generation (service README) from the service's JSON schema. The goal is to get an overview of how existing tools convert JSON Schema to Markdown documentation. To do so, a set of JSON Schema to Markdown conversion tools has been identified and thoroughly analysed. Each tool has been run on an example schema (full outputs in [`jsonschema2markdown/`](jsonschema2markdown)). The [Tool Evaluation Results](#tool-evaluation-results) section contains the results of this tool evaluation.
 
-Background research for the service docs generation (service README) from the service's JSON schema. The goal is to get an overview how the information in a JSON schema is commonly structured and represented in Markdown documents.
+### Output Categories
 
-This research evaluates a set to JSON Schema to Markdown conversion tools by running them locally and inspecting their input. The criterion for including a tool is that it can take a JSON schema as input and produce a Markdown file as output.
+During the analysis, we identified the following two output categories which we will use in the discussion of the individual tools:
 
-### Output categories
+**Hierarchical:** the schema's hierarchical structure is preserved — each field, object, and array is represented as an independent entity (a section, subsection, or linked file) that stands in a structural relationship with other entities, expressed, for example, through nesting or hyperlinks.
 
-- **Hierarchical:** the output mirrors the schema's nesting structure. Fields are presented as nested sections, nested tables, or a combination thereof.
-- **Flat:** all fields are listed in a single flat table regardless of nesting depth, with nesting expressed via dot-notation in the property name column (e.g. `items[].mode.strategy`).
+**Flat:** the schema hierarchy is flattened — all fields at all nesting levels are presented as uniform, standalone entries with no structural relationship to each other; each entry carries its full ancestry path (e.g. `items[].mode.strategy`) to preserve context.
 
 ### Tool Evaluation Results
 
@@ -49,86 +48,96 @@ This research evaluates a set to JSON Schema to Markdown conversion tools by run
 
 #### 1. [`prmd`](https://github.com/interagent/prmd) (Ruby)
 
-- GitHub: 2,093 stars | 636 commits | last: 2025-02-06 (14 months ago)
-- Output category: flat
-- Requires a specific combined schema format based on JSON Hyper-Schema draft-04 — not standard JSON Schema. Each resource must be defined under `definitions` with `links` (HTTP endpoints), field-level `definitions`, and `properties` referencing those definitions. Does not accept a plain JSON Schema file.
-- Purpose-built for REST API documentation: output includes HTTP method/path blocks, curl examples, and response examples — none of which are relevant for config schema documentation.
-- Schema structure is flat: nesting must be manually collapsed into dot-notation field names (e.g. `mode.settings.timeout` → `mode_settings_timeout`). No support for nested objects.
-- Output table columns: **Name**, **Type**, **Description**, **Example** — but requires `example` to be defined in the schema (not `examples` as in JSON Schema 2020-12).
-- Does not work with the original `config.schema.json` — requires a hand-crafted adapter schema.
+- **GitHub:** 2,093 stars | 636 commits | last: 2025-02-06 (14 months ago)
+- **Category:** Flat
+- **Formatting:** single table with all fields; nesting expressed via underscore-separated names (e.g. `mode_settings_timeout`)
+- **Metadata:** *Name*, *Type*, *Description*, *Example* as table columns
+- **Verbosity:** low for schema content; padded by irrelevant REST API scaffolding
+- **Constraint:** not applicable to arbitrary JSON schemas, expects schema to be in a certain format (HTTP REST API documentation)
 
 #### 2. [`json-schema-for-humans`](https://github.com/coveooss/json-schema-for-humans) (Python)
 
-- GitHub: 732 stars | 448 commits | last: 2026-04-14 (less than 1 week ago)
-- Output category: hierarchical
-- Each field gets a section with a metadata table listing its attributes
-- Table columns: Title, Description, Type, Required, Default, Examples, Pattern, Deprecated, Definition (and more) — all columns always present even when empty
-- Handles full nesting, `enum` values, required/optional status, `examples`, `additionalProperties`
-- The array item type heading is awkward ("items items") when the array item schema has no title
-- Also has HTML/JavaScript templates (`js`, `js_offline`) which produce richer, more polished output than the Markdown templates
+- **GitHub:** 732 stars | 448 commits | last: 2026-04-14 (less than 1 week ago)
+- **Category:** Hierarchical
+- **Formatting:** nested sections mirroring the schema hierarchy; each object field includes a child-property summary table followed by individual subsections per child
+- **Metadata:** *Type*, *Required*, *Additional properties* in a per-field vertical table; child-property summary tables include *Property*, *Pattern*, *Type*, *Deprecated*, *Definition*, *Title/Description*; array fields include an additional table with *Min items*, *Max items*, *Items unicity*, *Additional items*, *Tuple validation*; description and examples as separate paragraphs
+- **Verbosity:** very high — every field including simple scalars gets a full section; array item sections get an auto-generated "items items" heading when no `title` is set on the array item schema
 
 #### 3. [`@adobe/jsonschema2md`](https://github.com/adobe/jsonschema2md) (Node.js)
 
-- GitHub: 715 stars | 1,411 commits | last: 2026-04-14 (less than 1 week ago)
-- Output category: hierarchical
-- Multi-file output: generates one `.md` file per schema object and per property (12 files for our schema), designed for static site generators (Jekyll, GitHub Pages)
-- Root file covers only top-level fields; all nested content is in sibling files linked by relative paths
-- Root file includes a header table with columns: Abstract, Extensible, Status, Identifiable, Custom Properties, Additional Properties, Access Restrictions, Defined In
-- Each field section includes: type, required/optional, nullable, and a "defined in" cross-link to the sibling file
-- Does not support 2020-12 — `$schema` had to be stripped from the input to avoid a crash
+- **GitHub:** 715 stars | 1,411 commits | last: 2026-04-14 (less than 1 week ago)
+- **Category:** Hierarchical
+- **Formatting:** multi-file output — 12 files total: an index, a root overview, and one file per field/object/array (10 files for our schema); nested content lives in sibling files linked by relative paths; designed for static site generators
+- **Metadata:** every file includes a header table with *Abstract*, *Extensible*, *Status*, *Identifiable*, *Custom Properties*, *Additional Properties*, *Access Restrictions*, *Defined In*; root properties summary table adds *Property*, *Type*, *Required*, *Nullable*, *Defined by*; examples as separate code blocks
+- **Verbosity:** very high — every field gets its own file; header table is noise-heavy with mostly irrelevant metadata
 
 #### 4. [`wetzel`](https://github.com/CesiumGS/wetzel) (Node.js)
 
-- GitHub: 137 stars | 174 commits | last: 2022-07-18 (3 years 9 months ago)
-- Output category: hierarchical
-- Single-file output to stdout
-- Each field subsection includes: type, required, enum values, default, and numeric/string constraints
-- Only follows `$ref` references to resolve nested schemas — does not recurse into inline nested object properties; for our schema, only the root object is documented
-- Supports 2020-12 natively (also drafts 3, 4, 7)
+- **GitHub:** 137 stars | 174 commits | last: 2022-07-18 (3 years 9 months ago)
+- **Category:** Hierarchical
+- **Formatting:** single file; nested sections to represent hierarchy; each object gets a properties table with each field as a row
+- **Metadata:** *Type*, *Description*, *Required* as table columns
+- **Verbosity:** medium
+- **Constraint:** only resolves `$ref` references — does not recurse into inline nested objects; for our schema only the root object and the `items` array are documented
 
 #### 5. [`jsonschema-markdown`](https://github.com/elisiariocouto/jsonschema-markdown) (Python)
 
-- GitHub: 35 stars | 150 commits | last: 2026-03-25 (less than 1 month ago)
-- Output category: flat
-- Single flat table covering all fields across all nesting levels
-- Table columns: Property, Type, Required, Possible values, Deprecated, Default, Description, Examples
-- `enum` fields show all allowed values in the Possible values column; the Type column shows `None` when no `type` keyword is present (only `enum`)
+- **GitHub:** 35 stars | 150 commits | last: 2026-03-25 (less than 1 month ago)
+- **Category:** Flat
+- **Formatting:** single table with all fields; nesting expressed via dot-notation with array notation (e.g. `items[].mode.strategy`)
+- **Metadata:** *Property*, *Type*, *Required*, *Possible values*, *Deprecated*, *Default*, *Description*, *Examples* as table columns
+- **Verbosity:** low — all fields in a single compact table, no per-field sections or prose
 
 #### 6. [`json-schema-static-docs`](https://github.com/tomcollins/json-schema-static-docs) (Node.js)
 
-- GitHub: 31 stars | 298 commits | last: 2025-01-06 (15 months ago)
-- Output category: hierarchical
-- Each field gets a section with a vertical HTML table listing its attributes — only rows for attributes that are present in the schema, no empty rows
-- Table rows (when present): $id, Deprecated, Title, Description, Type, Required, Default, Read Only, Write Only, Const, Enum, constraints, Format, Pattern, Examples
-- Nesting expressed via dot notation in section headings (e.g. `items.mode.strategy`)
+- **GitHub:** 31 stars | 298 commits | last: 2025-01-06 (15 months ago)
+- **Category:** Hierarchical
+- **Formatting:** single file; each field gets a section at the same heading level; nesting expressed via dot-notation in section headings (e.g. `items.mode.strategy`)
+- **Metadata:** per-field vertical table with only present attributes as rows — *Description*, *Type*, *Required*, *Enum*, *Examples* (and others when present in the schema)
+- **Verbosity:** low — sparse per-field tables with only present attributes
 
 #### 7. [`json-schema-to-markdown`](https://github.com/saibotsivad/json-schema-to-markdown) (Node.js)
 
-- GitHub: 30 stars | 30 commits | last: 2019-06-26 (6 years 10 months ago)
-- Output category: hierarchical
-- Sections are nested to mirror the schema structure, with type and required status appended in parentheses to each heading (e.g. `` `strategy` (enum, required) ``)
-- Very compact — section body contains only the description, followed by enum values, default, and constraints if present; no tables or additional metadata
-- [`jsonschema-2-markdown`](https://github.com/hugorper/jsonschema-2-markdown) (1 star, last commit 2018) is a direct fork with identical output; only additions are cosmetic refactoring and a document template wrapper
+- **GitHub:** 30 stars | 30 commits | last: 2019-06-26 (6 years 10 months ago)
+- **Category:** Hierarchical
+- **Formatting:** single file; heading level deepens with each nesting level; type and required status appended in parentheses to each heading (e.g. `` `strategy` (enum, required) ``); no tables
+- **Metadata:** *Type* and *Required* in the section heading; enum values as a bullet list; description as prose
+- **Verbosity:** low — section body contains only description and enum values
+- **Note:** [`jsonschema-2-markdown`](https://github.com/hugorper/jsonschema-2-markdown) (1 star, last commit 2018) is a direct fork with identical output; only additions are cosmetic refactoring and a document template wrapper
 
 #### 8. [`jsonschema2mk`](https://github.com/simonwalz/jsonschema2mk) (Node.js)
 
-- GitHub: 10 stars | 131 commits | last: 2026-03-29 (less than 1 month ago)
-- Output category: hierarchical
-- Each schema object and array gets its own section; scalar properties are rows in the section's properties table
-- Table columns: Name, Type, Description, Required
-- Constraints and enum values are inlined into the Description cell
-- Also generates a JSON example block for each section
+- **GitHub:** 10 stars | 131 commits | last: 2026-03-29 (less than 1 month ago)
+- **Category:** Hierarchical
+- **Formatting:** single file; nested sections for objects and arrays mirroring the schema hierarchy; scalar properties remain as rows in the parent section's properties table
+- **Metadata:** *Name*, *Type*, *Description*, *Required* as table columns; enum values and constraints inlined into the *Description* cell
+- **Verbosity:** low — compact section-per-object structure with no per-scalar sections
 
 #### 9. [`json-schema-to-markdown-table`](https://www.jsdelivr.com/package/npm/json-schema-to-markdown-table) (Node.js)
 
-- Output category: flat
-- Single flat table covering all fields across all nesting levels
-- Table columns: Name, Type, Description
-- Optional fields are indicated by an `*Optional*` prefix in the Description column; no enum values, defaults, or constraints included
+- **Source:** published on jsDelivr only — no GitHub repository
+- **Category:** Flat
+- **Formatting:** single table with all fields; nesting expressed via dot-notation with array notation
+- **Metadata:** *Name*, *Type*, *Description* as table columns; optional fields marked with `*Optional*` in the *Description* cell; no enum values, defaults, or constraints
+- **Verbosity:** very low — minimal three-column table, least metadata of all evaluated tools
 
 ### Conclusions
 
-- TODO
+- JSON Schema to Markdown conversion tools use both output categories that we identified: 6 are Hierarchical, 3 are Flat
+- The two output categories seem to be suited for different purposes
+- **Hierarchical:** suited for a navigable reference
+  - Each field or object is an addressable entity that can be linked to individually (e.g. from an index or search result)
+  - The schema's structural relationships map to navigation operations (drill-down via nested sections or hyperlinks)
+  - Metadata can be rich without overwhelming the reader since each entity has its own dedicated space
+  - Scales well with schema complexity
+- **Flat:** suited for an at-a-glance overview of an entire schema
+  - All fields are represented as uniform standalone entities (each one including full ancestral path) which is easy to parse for small schemas
+  - Structural relationship mapping is given up for the potential of compact representation that allows showing the entire schema at a glance
+  - Close visual resemblance to the YAML or JSON that the schema defines
+  - Suitable to represent schemas that can be comprehended at a glance — becomes unwieldy for large schemas that require segmentation and navigation to comprehend
+- Conclusion for the Platypus docs generation:
+  - The Flat output category seems to be the better fit as schema complexity is expected to be low, navigation or search is not intended, and ideally the config structure should become apparent to the user at a single glance (while still allowing for the casual lookup of the necessary details for writing a valid config).
+  - None of the tested tools is suitable to be used directly for the docs generation. The way to go is to implement the tailored custom conversion logic from scratch.
 
 ---
 

@@ -1,7 +1,7 @@
 items:
   - name: alpha
     mode:
-      type: active
+      strategy: active
       settings:
         timeout: 30
         retries: 3
@@ -9,4 +9,4 @@ items:
     enabled: true
   - name: beta
     mode:
-      type: standby
+      strategy: standby
