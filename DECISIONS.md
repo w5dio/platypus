@@ -332,44 +332,37 @@ Concrete technology choices for implementing the platform, recorded where multip
 
 ### Terraform State Storage: HCP Terraform
 
+Tooling for the storage of the Terraform state file.
+
 **Considered options:**
 
-- **Local file:** not accessible from GitHub Actions — ruled out
-- **Git:** state can contain secrets; causes messy diffs
-- **S3 + DynamoDB:** viable but requires managing AWS credentials in GitHub Actions solely for state access
-- **HCP Terraform:** free tier covers unlimited state storage and up to 500 managed resources, clean integration via `hashicorp/setup-terraform`, handles state locking out of the box
+- **File in same GitHub repository:** the state file is immediately available to Terraform both locally and in the workflow; no additional infrastructure required; violates best practices; state files can contain secrets
+- **Cloud object storage (AWS S3 + DynamoDB, Azure Blob Storage, Google Cloud Storage):** object storage with native Terraform backend support and state locking; requires managing a set of separate credentials (could be simplified with OpenID Connect); requires maintaining the object storage infrastructure
+- **HCP Terraform:** managed Terraform service on HashiCorp Cloud Platform (HCP) providing Terraform remote execution, state storage, and variable/secrets management; requires managing a set of separate credentials; paid after a free tier of 500 managed resources; possibility to also use for secrets management (see [Terraform Secrets Management](#terraform-secrets-management-hcp-terraform))
+- **GitHub Actions workflow artefact:** store as a GitHub Actions artefact after each workflow run (see [sturlabragason/terraform_state_artifact](https://github.com/sturlabragason/terraform_state_artifact), [devgioele/terraform-state-artifact](https://github.com/devgioele/terraform-state-artifact), [BadgerHobbs/terraform-state](https://github.com/BadgerHobbs/terraform-state) for community-provided implementation); no additional infrastructure or credentials required; state cannot be synchronised from local machine to workflow environment; GitHub Actions artefact retention is limited to 90 days
+- **Bring-your-own (BYO):** state storage tool chosen and configured by the developer by adding a `backend` block to the Terraform code; seamless integration because this is an intended Terraform use case; no dictated tool lock-in; places decision and maintenance burden on the developer
 
 **Decision:** HCP Terraform
 
-**Rationale:** HCP Terraform is the only option with zero additional credential management, native GitHub Actions integration, and free-tier state storage including locking — no other option matches this combination without added operational overhead.
+**Rationale:** HCP Terraform offers a similar experience as the cloud object storage solutions, but in addition has the possibility to be reused for other purposes (e.g. secrets management). HCP Terraform is also the officially recommended way to use Terraform professionally. BYO is most flexible and unopinionated option but it puts a non-negligible setup burden on the developer by default.
 
-### Terraform Secrets Storage: TBD
+### Terraform Secrets Management: HCP Terraform
 
-Storage location for secrets required by the Terraform provisioning code.
-
-**Core constraints:**
-
-1. **Cross-service sharing:** a secret defined once is accessible from any number of Platypus service repositories — no per-repo duplication
-2. **GitHub-agnostic:** secrets management is independent of GitHub account structure — works identically for personal accounts, organisations, and Platypus services spread across multiple GitHub accounts
-3. **Local accessibility:** secrets are injectable as local env vars with minimal setup to support local Terraform development without manual configuration per machine
-4. **Minimal dependencies:** introduce as few new accounts, credentials, or infrastructure components as possible
+Tooling for the management of secrets required by the Terraform provisioning code.
 
 **Considered options:**
 
-> WIP: work in progress - this list is not final.
+- **GitHub Actions secrets:** secrets stored natively in GitHub; available to workflow without additional tooling or credentials; can be defined at [repository level](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets?tool=webui#creating-secrets-for-a-repository) or [organisation level](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets?tool=webui#creating-secrets-for-an-organization); organisation level secrets can be shared between Platypus service repositories, but this works only for GitHub organisations, not user accounts; requires separate management of secrets for local execution since GitHub Actions secrets are only ever exposed to workflow runs and cannot be read otherwise
+- **Managed secrets stores (AWS Secrets Manager, Azure Key Vault, Google Secret Manager, Doppler, Infisical, 1Password Secrets Automation, etc.):** requires managing a set of separate credentials; independent of GitHub account structure; supports sharing of secrets between Platypus service repositories; obtaining secrets for local execution requires additional step with CLI tool or API
+- **HCP Terraform:** managed Terraform service on HashiCorp Cloud Platform (HCP) providing Terraform remote execution, state storage, and variable/secrets management; thanks to remote execution, secrets never need to be fetched since Terraform execution (whether triggered locally or from the workflow) happens within HCP Terraform; no additional secret injecting steps needed for triggering execution locally; allows secret sharing across Platypus services with [variable sets](https://developer.hashicorp.com/terraform/cloud-docs/variables/managing-variables#variable-sets); possibility to also use for state storage (see [Terraform State Storage: HCP Terraform](#terraform-state-storage-hcp-terraform))
+- **Bring-your-own (BYO):** secrets management tool chosen and set up by the developer; no dictated tool lock-in; requires custom logic in the workflow implementation which must be implemented by the developer; requires developer to implement secrets injection for local execution
+- **OpenID Connect (OIDC):** instead of statically storing and fetching authentication credentials, these credentials are generated on the fly in an OIDC step; only works for authentication secrets (credentials), not other types of secrets; requires custom logic in the workflow file (such as provider-specific OIDC authentication actions) which must be implemented by the developer; OIDC process works differently locally and in the workflow; not all infrastructure providers support OIDC authentication from GitHub Actions
 
-- **GitHub Actions Repository Secrets:** secrets stored in each service repository; naturally satisfies constraint 4 (zero additional tooling or accounts); ruled out by constraint 1 because shared credential must be duplicated across repositories
-- **GitHub Actions Organisation Secrets:** secrets stored at the GitHub organisation level; in addition to constraint 4 satisfies constraint 1 (shared secrets need to be defined only once); fails at constraint 2 because it only works for GitHub organisations, not personal accounts; also mixes secrets with other organisation secrets
-- **HCP Vault Secrets:** managed secrets store on HCP; naturally satisfies constraints 1 and 2; satisfies constraint 3 through the 'vlt' CLIjjjjka
+**Decision:** HCP Terraform
 
-natural complement to HCP Terraform which the platform already uses; accessible from GitHub Actions via the HCP Vault Secrets Action
-- **Other managed secret stores (AWS Secrets Manager, Azure Key Vault, etc.):** require additional credentials in GitHub Actions to access them — adds an external dependency
-- **Self-hosted secret stores (HashiCorp Vault, Infisical, OpenBao, etc.):** powerful and flexible; requires building and operating additional infrastructure
-- **OIDC:** eliminates stored long-lived credentials by requesting short-lived tokens from the cloud provider at runtime; only applicable to cloud providers that support OIDC with GitHub Actions — not universal
+**Rationale:** HCP Terraform is already used for state storage, thus it introduces no additional dependency. The remote execution feature eliminates the need for a local secrets injection solution for local execution entirely - a problem that all other options have. It logically separates all secrets used in Platypus from other unrelated secrets and allows secret sharing between Platypus services.
 
-**Decision:** TBD
-
-**Rationale:** TBD
+> Note: HCP Vault Secrets was also considered as an option but it was [sunsetted in June 2025](https://developer.hashicorp.com/hcp/docs/vault-secrets/end-of-sale-announcement). It has thus been removed from consideration.
 
 ### Service Docs Generation: Custom Script
 

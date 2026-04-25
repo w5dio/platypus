@@ -8,25 +8,9 @@ Sub-items under a task are working notes and prior research to be consumed and i
 
 ## Tasks
 
-- [ ] DECISIONS.md: redo Terraform State Storage and Secrets Storage sections (with all decisions), add HCP Terraform rationale
-  - [ ] **HCP Terraform as the canonical choice for professional Terraform usage**
-    - Terraform is the only viable IaC option (already decided)
-    - HCP Terraform is the official managed service from HashiCorp — the same maker as Terraform — designed specifically for managed state and secrets in Terraform workflows
-    - If not HCP Terraform for this, then what? Any alternative is either a workaround or a third-party approximation of what HCP Terraform does natively
-  - [ ] **Redo Terraform State Storage and Terraform Secrets Storage sections in DECISIONS.md**
-    - Reconsider and tighten the considered options
-    - Bring all options into a common concise format
-    - Add new items (to be listed)
-    - **State storage — new/updated options:**
-      - GitHub Actions workflow artefact (community implementations: sturlabragason/terraform_state_artifact, devgioele/terraform-state-artifact, BadgerHobbs/terraform-state)
-      - Cloud object storage: expand S3 + DynamoDB into a category covering AWS S3 + DynamoDB, Azure Blob Storage, Google Cloud Storage; note that OIDC could make auth considerably easier for all of these
-      - BYO: the developer decides the state storage tool (main advantage - no dictated lock-in); implement by the framework not writing a `backend` block in the boilerplate Terraform code; the developer configures any Terraform-supported backend themselves; Terraform handles the rest identically regardless of backend choice
-    - **Secrets storage — new/updated options:**
-      - BYO: the developer decides the secrets management tool (main advantage - no dictated lock-in); requires custom logic tailored at the chosen tool for injecting the secrets into the Terraform code both locally and in the workflow; problem: the workflow file is provided by the framework and thus can't know this custom logic beforehand which means that the developer needs to implement it - this contradicts the value proposition of the framework that boilerplate is eliminated and only business logic needs to be implemented
-  - [ ] **Remove HCP Vault Secrets from DECISIONS.md secrets options:** end of sale announced June 2025; remove as a candidate option but add a note acknowledging it existed and was discontinued — relevant context given how recently it happened
-
+- [x] DECISIONS.md: redo Terraform State Storage and Secrets Storage sections (with all decisions), add HCP Terraform rationale
 - [ ] Carry out HCP Terraform research in research.md
-  - [ ] **Add HCP Terraform research section to research.md**
+  - **Add HCP Terraform research section to research.md**
     - **Pricing:** free tier of 500 managed resources; after that $0.10/resource/month — to be verified against https://www.hashicorp.com/en/pricing?tab=terraform; get an intuition of how quickly the 500 resource limit is reached in practice
     - **Company:** IBM acquired HashiCorp in February 2025 (https://www.hashicorp.com/en/blog/hashicorp-officially-joins-the-ibm-family)
     - **Name:** research needed — why is it called "IBM HCP Terraform" on some pages and "HCP Terraform" on others? Are they the same thing? What is the official name going forward?
@@ -47,18 +31,18 @@ Sub-items under a task are working notes and prior research to be consumed and i
     - **Dynamic provider credentials** (https://developer.hashicorp.com/terraform/cloud-docs/dynamic-provider-credentials): briefly explain basic idea; verify whether transparent to Terraform code and execution — i.e. can a service developer switch from static secrets to dynamic provider credentials without changing anything else?
     - **Variable sets** (https://developer.hashicorp.com/terraform/cloud-docs/variables/managing-variables#variable-sets): can be defined at organisation and project level; variables in a variable set are assigned automatically to every workspace in the corresponding organisation or project
     - **GitHub Actions integration:** `hashicorp/setup-terraform` is the official GitHub Action for authenticating and setting up the Terraform CLI in a workflow; research whether there are other official HCP Terraform GitHub Actions beyond this
-  - [ ] **HCP Terraform workspace creation — test results**
+  - **HCP Terraform workspace creation — test results**
     - `workspaces.name`: if workspace does not exist, `terraform init` silently creates it — no prompts, no output messages; `terraform plan` and `terraform apply` work seamlessly on the new workspace
     - `workspaces.tags` (no matching workspace): `terraform init` prompts for a new workspace name, creates it, then proceeds; `terraform plan` and `terraform apply` work seamlessly
     - `workspaces.tags` (one matching workspace exists): workspace implicitly used, no output messages
     - `workspaces.tags` (multiple matching workspaces exist): one matching workspace implicitly used — selection rule unclear
-  - [ ] **HCP Terraform authentication — research and document all methods**
+  - **HCP Terraform authentication — research and document all methods**
     - **Local — user token:** interactive browser-based OAuth flow via `terraform login`; issues a personal user token stored in `~/.terraform.d/credentials.tfrc.json`; tied to the individual developer's account; one-time setup per machine
     - **GitHub Actions — team/organisation token:** long-lived API token generated in the HCP Terraform UI; stored as a GitHub Actions secret (`TF_API_TOKEN`); scoped to a team or organisation, not tied to a specific user; must be added to every new service repository
     - **GitHub Actions — OpenID Connect:** *(not yet verified — to be researched)* GitHub Actions authenticates to HCP Terraform via OpenID Connect Workload Identity Federation with no stored token; motivation: eliminate the need to add a static API token to every service repository; possible lead: https://github.com/hashicorp/hcp-auth-action
 
 - [ ] Scaffold/draft `install` script
-  - [ ] **Service repository initialisation and HCP Terraform workspace creation flow**
+  - **Service repository initialisation and HCP Terraform workspace creation flow**
 
     **Path A — dev runs Terraform locally first, then pushes:**
     1. Install script: framework files + Terraform boilerplate code generated (including `cloud` block with HCP Terraform workspace name, config file reading, etc.)
@@ -84,6 +68,6 @@ Sub-items under a task are working notes and prior research to be consumed and i
 - [ ] Implement `scripts/validate-config` (based on decision in DECISIONS.md)
 - [ ] Create Config Schema section in AGENTS.md
   - [ ] Pop the stash containing the in-progress AGENTS.md changes: `git stash pop stash@{0}` (stash@{0}: WIP on main: 0d9453d Finalise research about JSON Schema to Markdown conversion tools)
-  - [ ] When working on AGENTS.md, add the following to CLAUDE.md (remove when AGENTS.md is complete):
+  - When working on AGENTS.md, add the following to CLAUDE.md (remove when AGENTS.md is complete):
     **Goal of AGENTS.md:** AGENTS.md is installed into every service repository. Its purpose is to allow a coding agent that spins up in a fresh service repository (containing only the framework files) to fulfil its role without any additional context. The agent's role is to build a complete service together with the developer. The developer brings domain knowledge — what infrastructure to provision, what the config should look like — and the agent brings framework knowledge: what files to create, how to structure them, what constraints apply, and how everything fits together. They work interactively. AGENTS.md must give the agent everything it needs to know: the framework's structure, constraints, and conventions. It is not a tutorial — it is a complete reference for the agent's specific task.
 - [ ] TBD: further tasks (workflow file, final implementation of `install` script, etc.)
